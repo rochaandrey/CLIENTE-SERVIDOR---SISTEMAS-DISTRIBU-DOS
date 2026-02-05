@@ -58,3 +58,57 @@
             print("Resposta do servidor:", resposta)
 
             meuCliente.close()
+
+---
+
+## ATIVIDADE II - RPC (REMOTE PROCEDURE CALL) COM RPYC
+
+### DESCRIÇÃO:
+
+#### Servidor:
+- Utiliza a biblioteca **RPyC** para expor um serviço de consulta de horário.
+- Em vez de gerenciar bytes e buffers manualmente, ele disponibiliza um método que pode ser chamado remotamente como uma função comum.
+
+#### Cliente:
+- Conecta-se ao servidor via protocolo RPC.
+- Invoca a função de horário do servidor, recebe o dado processado e encerra a conexão.
+
+### EXPLICAÇÃO DO CÓDIGO (COM COMENTÁRIOS):
+
+#### Servidor (`server.py`)
+No modelo RPC, definimos um **Serviço** que agrupa as funções que queremos disponibilizar na rede.
+
+        class TimeService(rpyc.Service):
+            # 'exposed_' é uma regra do RPyC: apenas métodos com esse nome podem ser chamados pelo cliente
+
+            def exposed_get_time(self):
+                # retorna o horário atual formatado. 
+                # o RPC converte essa string em bytes para o envio.
+                return datetime.now().strftime("%H:%M:%S")
+
+        # ThreadedServer permite que o server aceite múltiplas conexões simultâneas, criando uma thread para cada nova chamada.
+
+        server = ThreadedServer(TimeService, port=18812)
+        server.start()
+
+
+
+#### Cliente (`client.py`)
+A principal vantagem é a **transparência**: o código do cliente não precisa saber detalhes de rede (sockets) para obter o dado.
+
+        # rpyc.connect estabelece a conexão (o "stub") com o servidor na porta 18812.
+        conn = rpyc.connect("localhost", 18812)
+        
+        # 'conn.root' acessa o serviço remoto. 
+        # Chamamos get_time() como se fosse uma função local do meu script.
+        horario = conn.root.get_time() 
+        
+        # Exibe o resultado e encerra a sessão RPC.
+        print(f"Horário recebido do servidor: {horario}")
+        conn.close()
+
+### DIFERENÇAS EM RELAÇÃO AO SOCKET (ATIVIDADE I):
+
+* **Abstração de Dados**: Não é necessário usar `.encode()`, `.decode()` ou definir `recv(1024)`. O RPyC lida com a serialização dos dados automaticamente.
+* **Foco na Função**: No Socket, o servidor precisa interpretar o texto recebido para saber o que fazer. No RPC, o cliente escolhe diretamente a função que deseja executar no servidor.
+* **Gerenciamento de Conexão**: O RPyC abstrai o controle de fluxo, garantindo que a chamada de função retorne o valor esperado de forma síncrona.
